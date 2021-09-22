@@ -1,48 +1,51 @@
-module sensor #(
-	parameter size=64)
+module sensor 
 	(
 	output logic error,
-	input clk
+	input clk,
+	input logic inc_data
 );
+	parameter size=0;
 	parameter splits = 8;
+	parameter nothing = 0;
 	genvar i;
+	
+	initial begin
+		error = 0;
+	end
 
 	generate 
 		// leaf senstive to bitflips in array
 		int to_split, between;
-		if (size < splits) begin
-			genvar i;
-			reg state[size:0] = 0;
+		if (size <= splits) begin
+			reg [size:0] state = 0;
+		
 			always_ff@(posedge clk) begin
-				for (i=0; i<size; i++) begin
-					error <= error & state[i];
-				end
+				error <= &state;
+				//state += inc_data;
 			end
 		end
 		// node sensitive to bitflips in children
 		else begin
-			assign to_split = size;
 			// Create {split} children, and spilt the task of watching 
 			// {size} bits
 			// and watch them for errors
-			wire error_bus[8:0];
+			wire [splits-1:0] error_bus;
+			reg [splits-1:0] error_out;
+			
+			
 
-			for (i=splits; i > 0; i--) begin
+			for (i=0; i < splits; i++) begin : create_children
 				// i holds the number of children left to split between
-				
-				// Calculate how much this child should watch
-				int childs_size = $ceil(to_split/i);
-				assign to_split = to_split - childs_size;
+			int new_size = size / splits;
 
-				sensor child #(.size=3) (error_bus[i-1], clk);
-				defparam child.size = size;
-				genvar j;
-				always_ff@(posedge clk) begin
-					for (j=0; j<size; j++) begin
-						assign error = error_bus[i-1] & error;
-					end
-				end
+				sensor #(.size(new_size )) child (error_bus[i], clk, inc_data);
 			end
+			
+	
+			always_ff@(posedge clk) begin
+				error <= &error_bus;
+			end
+	
 		end
 	endgenerate
 endmodule

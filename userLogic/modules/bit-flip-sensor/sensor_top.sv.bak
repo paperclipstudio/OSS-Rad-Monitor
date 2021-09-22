@@ -1,0 +1,4 @@
+module sensor_top(clk, error);
+	sensor sen(clk, error);
+		defparam sen.size = 62;
+endmodule
