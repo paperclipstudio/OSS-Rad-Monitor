@@ -2,11 +2,10 @@ module sensor
 	(
 	output logic error,
 	input clk,
-	input logic inc_data
+  input data
 );
-	parameter size=0;
-	parameter splits = 8;
-	parameter nothing = 0;
+	parameter depth=0;
+	parameter split_count = 8;
 	genvar i;
 	
 	initial begin
@@ -15,32 +14,27 @@ module sensor
 
 	generate 
 		// leaf senstive to bitflips in array
-		int to_split, between;
-		if (size <= splits) begin
-			reg [size:0] state = 0;
-		
+		if (depth <= 0) begin
 			always_ff@(posedge clk) begin
-				error <= &state;
-				//state += inc_data;
+				error <= &data;
 			end
 		end
 		// node sensitive to bitflips in children
 		else begin
-			// Create {split} children, and spilt the task of watching 
-			// {size} bits
-			// and watch them for errors
-			wire [splits-1:0] error_bus;
-			reg [splits-1:0] error_out;
-			
-			
+				int total_data_length = split_count**depth;
+				int block_size = total_data_length / split_count;
+			wire [split_count-1:0] error_bus;
+			reg [split_count-1:0] error_out;
+			for (i=0; i < split_count; i++) begin : create_children
+				int data_start = i * block_size;
+							int data_end = data_start + block_size - 1;
 
-			for (i=0; i < splits; i++) begin : create_children
-				// i holds the number of children left to split between
-			int new_size = size / splits;
-
-				sensor #(.size(new_size )) child (error_bus[i], clk, inc_data);
+				sensor #(.depth(depth-1), .split_count(split_count)) 
+							child (error_bus[i], 
+											clk, 
+											data[data_end:data_start]
+							);
 			end
-			
 	
 			always_ff@(posedge clk) begin
 				error <= &error_bus;
